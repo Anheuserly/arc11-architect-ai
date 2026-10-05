@@ -14,10 +14,29 @@ export interface ProcessIncomingMessageParams {
 }
 
 export class MessageProcessorService {
+  private static processingChains = new Map<string, Promise<void>>();
+
   /**
    * Main entry point for processing incoming WhatsApp messages
    */
   public static async processIncomingMessage(params: ProcessIncomingMessageParams): Promise<void> {
+    const contactKey = params.fromPhone.replace(/[^\d]/g, '');
+    const previous = this.processingChains.get(contactKey) || Promise.resolve();
+    const current = previous
+      .catch(() => undefined)
+      .then(() => this.processIncomingMessageNow(params));
+
+    this.processingChains.set(contactKey, current);
+    try {
+      await current;
+    } finally {
+      if (this.processingChains.get(contactKey) === current) {
+        this.processingChains.delete(contactKey);
+      }
+    }
+  }
+
+  private static async processIncomingMessageNow(params: ProcessIncomingMessageParams): Promise<void> {
     const { wamid, fromPhone, senderName, body, messageType = 'text', rawPayload } = params;
 
     // 1. Strict Idempotency Check
@@ -283,6 +302,10 @@ export class MessageProcessorService {
       contactName: contact.name || undefined,
     });
     await this.sendAndRecordReply(conversation.id, contact.phoneNumber, aiAnswer);
+
+    // A meaningful three-message exchange is enough for a human architect to take
+    // over with context, rather than leaving a qualified prospect in an endless bot loop.
+    await this.escalateAfterQualifiedExchange(conversation.id, contact.phoneNumber);
   }
 
   /**
@@ -290,7 +313,7 @@ export class MessageProcessorService {
    */
   private static async initiateLeadIntake(conversationId: string, contact: any): Promise<void> {
     const prompt =
-      'Thank you for your interest in ARC 11 Architect.\n\nTo help our design team understand your project, could you please share:\n\n1. *Project Location* (City or Area)?';
+      'Thank you for your interest in ARC 11 Architect.\n\nTo help our design team prepare for a useful discussion, may I first have the *project location* (city or area)?';
 
     await prisma.conversationState.upsert({
       where: { conversationId },
@@ -335,19 +358,30 @@ export class MessageProcessorService {
 
     if (stateRecord.currentState === 'collecting_plot_size') {
       data.plotArea = input;
-      const prompt = 'Great. How many *floors* are you planning (e.g. G+1, G+2, Duplex)?';
+      const prompt = 'Thank you. Do you have a *budget range* in mind? A broad range is completely fine; we use it only to guide suitable options.';
       await prisma.conversationState.update({
         where: { id: stateRecord.id },
-        data: { currentState: 'collecting_floors', collectedData: data, lastPromptSent: prompt },
+        data: { currentState: 'collecting_budget', collectedData: data, lastPromptSent: prompt },
       });
       await this.sendAndRecordReply(conversationId, contact.phoneNumber, prompt);
       return true;
     }
 
-    if (stateRecord.currentState === 'collecting_floors') {
-      data.floors = input;
+    if (stateRecord.currentState === 'collecting_budget') {
+      data.budget = input;
       const prompt =
-        'Do you have any specific requirements or preferred project style (e.g. 4 Bedrooms, Modern elevation, Vastu compliant)?';
+        'When would you ideally like to *start* or *complete* the project? An approximate timeline is perfect.';
+      await prisma.conversationState.update({
+        where: { id: stateRecord.id },
+        data: { currentState: 'collecting_timeline', collectedData: data, lastPromptSent: prompt },
+      });
+      await this.sendAndRecordReply(conversationId, contact.phoneNumber, prompt);
+      return true;
+    }
+
+    if (stateRecord.currentState === 'collecting_timeline') {
+      data.timeline = input;
+      const prompt = 'Lastly, please share the project type and any priorities (for example: 4 bedrooms, modern elevation, Vastu, interiors, or renovations).';
       await prisma.conversationState.update({
         where: { id: stateRecord.id },
         data: { currentState: 'collecting_requirements', collectedData: data, lastPromptSent: prompt },
@@ -362,15 +396,28 @@ export class MessageProcessorService {
       // Finalize and Create Qualified Lead in Database
       const org = await prisma.organization.findFirst();
       if (org) {
-        const lead = await prisma.lead.create({
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+        const existingLead = await prisma.lead.findFirst({
+          where: { contactId: contact.id, createdAt: { gte: twoHoursAgo } },
+          orderBy: { createdAt: 'desc' },
+        });
+        const leadData = {
+          projectType: data.projectType || 'Residential Architecture',
+          location: data.location,
+          plotArea: data.plotArea,
+          budget: data.budget,
+          timeline: data.timeline,
+          requirements: data.requirements,
+          status: 'DETAILS_CAPTURED' as const,
+        };
+        const lead = existingLead ? await prisma.lead.update({
+          where: { id: existingLead.id },
+          data: leadData,
+        }) : await prisma.lead.create({
           data: {
             organizationId: org.id,
             contactId: contact.id,
-            projectType: data.projectType || 'Residential Architecture',
-            location: data.location,
-            plotArea: data.plotArea,
-            floors: data.floors,
-            requirements: data.requirements,
+            ...leadData,
           },
         });
 
@@ -387,7 +434,7 @@ export class MessageProcessorService {
       // Record in client memory
       await ClientMemoryService.recordInteractionMemory(
         contact.id,
-        `Location: ${data.location}, Plot: ${data.plotArea}, Floors: ${data.floors}, Style: ${data.requirements}`
+        `Location: ${data.location}, Plot: ${data.plotArea}, Budget: ${data.budget}, Timeline: ${data.timeline}, Style: ${data.requirements}`
       );
 
       // Reset state machine
@@ -396,9 +443,10 @@ export class MessageProcessorService {
         data: { currentState: 'idle', collectedData: {} },
       });
 
-      const finalSummary = `Thank you! Your project enquiry has been registered with ARC 11 Architect:\n\n📍 *Location:* ${data.location}\n📐 *Plot Area:* ${data.plotArea}\n🏢 *Floors:* ${data.floors}\n✨ *Requirements:* ${data.requirements}\n\nOur architectural team will review these details and contact you for a concept discussion. You can also send site drawings, sketches, or photos right here!`;
+      const finalSummary = `Thank you! Your project enquiry has been registered with ARC 11 Architect:\n\n📍 *Location:* ${data.location}\n📐 *Project Size:* ${data.plotArea}\n💼 *Budget Range:* ${data.budget}\n🗓️ *Timeline:* ${data.timeline}\n✨ *Requirements:* ${data.requirements}\n\nI’m now passing this to our architectural team for a focused manual discussion. You can also send site drawings, sketches, or photos right here!`;
 
       await this.sendAndRecordReply(conversationId, contact.phoneNumber, finalSummary);
+      await this.requireHumanHandoff(conversationId, 'Project briefing completed: location, size, budget, timeline, and requirements captured.');
       return true;
     }
 
@@ -427,5 +475,34 @@ export class MessageProcessorService {
         senderType: 'bot',
       },
     });
+  }
+
+  private static async escalateAfterQualifiedExchange(conversationId: string, toPhone: string): Promise<void> {
+    const inboundCount = await prisma.message.count({
+      where: {
+        conversationId,
+        direction: MessageDirection.INBOUND,
+        body: { not: '' },
+      },
+    });
+    if (inboundCount < 3) return;
+
+    await this.requireHumanHandoff(conversationId, 'Three substantive customer messages received; route to an architect for manual discussion.');
+    await this.sendAndRecordReply(
+      conversationId,
+      toPhone,
+      'Thank you for the details. To give you project-specific guidance, I’m now routing this conversation to our architectural team for a manual discussion.'
+    );
+  }
+
+  private static async requireHumanHandoff(conversationId: string, reason: string): Promise<void> {
+    const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
+    if (!conversation || conversation.status === ConversationStatus.HUMAN_REQUIRED || conversation.status === ConversationStatus.HUMAN_ACTIVE) return;
+
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { status: ConversationStatus.HUMAN_REQUIRED },
+    });
+    await prisma.handoff.create({ data: { conversationId, reason } });
   }
 }

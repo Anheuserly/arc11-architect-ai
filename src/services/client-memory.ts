@@ -9,6 +9,7 @@ export interface ClientProfileMemory {
   likes?: string[];
   dislikes?: string[];
   budget?: string;
+  timeline?: string;
   notes?: string[];
   updatedAt?: string;
 }
@@ -119,9 +120,15 @@ export class ClientMemoryService {
     }
 
     // 7. Budget
-    const budgetMatch = text.match(/(?:budget|cost)\s*(?:is|around|approx|of)?\s*([₹$]?\s*\d+(?:\.\d+)?\s*(?:cr|crore|crores|lakh|lakhs|l|k)?)/i);
+    const budgetMatch = text.match(/(?:budget|cost)\s*(?::|is|around|approx|of)?\s*([₹$]?\s*\d+(?:\.\d+)?\s*(?:crores?|lakhs?|cr|l|k)?)/i);
     if (budgetMatch) {
-      extracted.budget = budgetMatch[0].trim();
+      extracted.budget = budgetMatch[1].trim();
+    }
+
+    // 8. Timeline / desired start or completion date
+    const timelineMatch = text.match(/(?:timeline|completion|complete|start|starting|within|by)\s*(?:is|around|in|by|from)?\s*([\w\s-]{2,40}(?:days?|weeks?|months?|year|years?|asap|immediately|diwali|december|january|february|march|april|may|june|july|august|september|october|november)?)/i);
+    if (timelineMatch && /(day|week|month|year|asap|immediate|diwali|january|february|march|april|may|june|july|august|september|october|november|december)/i.test(timelineMatch[0])) {
+      extracted.timeline = timelineMatch[0].trim();
     }
 
     if (styles.length > 0) extracted.stylePreferences = styles;
@@ -151,6 +158,7 @@ export class ClientMemoryService {
     if (newInsights.location) currentMemory.location = newInsights.location;
     if (newInsights.plotArea) currentMemory.plotArea = newInsights.plotArea;
     if (newInsights.budget) currentMemory.budget = newInsights.budget;
+    if (newInsights.timeline) currentMemory.timeline = newInsights.timeline;
 
     if (newInsights.stylePreferences && newInsights.stylePreferences.length > 0) {
       currentMemory.stylePreferences = Array.from(
@@ -220,6 +228,8 @@ export class ClientMemoryService {
           projectType: insights.projectType || existingLead.projectType,
           location: insights.location || existingLead.location,
           plotArea: insights.plotArea || existingLead.plotArea,
+          budget: insights.budget || existingLead.budget,
+          timeline: insights.timeline || existingLead.timeline,
           requirements: `${existingLead.requirements ? existingLead.requirements + ' | ' : ''}${message}`.slice(0, 1000),
         },
       });
@@ -235,6 +245,8 @@ export class ClientMemoryService {
         location: insights.location || 'NCR / Inquired via WhatsApp',
         plotArea: insights.plotArea || 'To be specified',
         floors: insights.floors || 'To be discussed',
+        budget: insights.budget,
+        timeline: insights.timeline,
         requirements: message,
       },
     });

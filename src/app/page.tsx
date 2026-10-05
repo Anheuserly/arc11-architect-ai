@@ -579,6 +579,7 @@ export default function DashboardPage() {
                       mem.location || 
                       mem.plotArea || 
                       mem.budget || 
+                      mem.timeline ||
                       (mem.stylePreferences && mem.stylePreferences.length > 0) ||
                       (mem.likes && mem.likes.length > 0) ||
                       (mem.dislikes && mem.dislikes.length > 0)
@@ -610,6 +611,12 @@ export default function DashboardPage() {
                           <div>
                             <span className="text-[10px] uppercase font-bold text-[#9b6843] tracking-wide block">Budget:</span>
                             <span className="text-[#1c1a17] font-medium">{mem.budget}</span>
+                          </div>
+                        )}
+                        {mem.timeline && (
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-[#9b6843] tracking-wide block">Timeline:</span>
+                            <span className="text-[#1c1a17] font-medium">{mem.timeline}</span>
                           </div>
                         )}
                         {mem.stylePreferences && mem.stylePreferences.length > 0 && (

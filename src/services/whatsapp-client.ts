@@ -16,8 +16,9 @@ export class WhatsAppClient {
   public static verifySignature(rawBody: string, signatureHeader?: string | null): boolean {
     const appSecret = process.env.META_APP_SECRET || process.env.META_WEBHOOK_SECRET;
     if (!appSecret || !signatureHeader) {
-      // In dev mode without configured secret, allow testing
-      if (process.env.NODE_ENV !== 'production') return true;
+      // An unsigned request is only acceptable for local tests when no secret has
+      // been configured at all. Never bypass a configured Meta app secret.
+      if (!appSecret && process.env.NODE_ENV !== 'production') return true;
       return false;
     }
 
@@ -50,6 +51,16 @@ export class WhatsAppClient {
   }> {
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
     const accessToken = process.env.META_ACCESS_TOKEN;
+
+    // Lets developers exercise the complete inbound/AI/lead pipeline locally
+    // without accidentally sending customer-facing WhatsApp messages.
+    if (process.env.WHATSAPP_DRY_RUN === 'true') {
+      console.info('[WhatsAppClient] Dry-run enabled. Outbound delivery not sent to Meta.');
+      return {
+        success: true,
+        wamid: `dry_run_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+      };
+    }
 
     if (!phoneNumberId || !accessToken || accessToken.startsWith('placeholder_')) {
       console.warn('[WhatsAppClient] Meta credentials not configured. Mocking outbound delivery.');

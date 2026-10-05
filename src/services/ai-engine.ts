@@ -63,6 +63,7 @@ export class AiEngineService {
       if (m.projectType) memLines.push(`Project Type: ${m.projectType}`);
       if (m.plotArea) memLines.push(`Plot Area: ${m.plotArea}`);
       if (m.budget) memLines.push(`Budget: ${m.budget}`);
+      if (m.timeline) memLines.push(`Desired timeline: ${m.timeline}`);
       if (m.stylePreferences && m.stylePreferences.length > 0) memLines.push(`Design Style Preferences: ${m.stylePreferences.join(', ')}`);
       if (m.likes && m.likes.length > 0) memLines.push(`Client Likes/Special Requirements: ${m.likes.join(', ')}`);
       if (m.dislikes && m.dislikes.length > 0) memLines.push(`Client Dislikes/Things to Avoid: ${m.dislikes.join(', ')}`);
@@ -133,6 +134,18 @@ ${knowledgeContext}`;
 
     if (lower.includes('price') || lower.includes('cost') || lower.includes('rate') || lower.includes('quote') || lower.includes('fee')) {
       return `${salutation}at ARC 11 Architect, architectural and design fees depend on site parameters, built-up area, and drawing requirements.\n\nWe provide tailored proposals after reviewing your site details. ${knownLoc ? `Since your project is in *${knownLoc}*, our team can prepare a site-specific proposal.` : 'Would you like to share your project location and plot area to get started?'}`;
+    }
+
+    if (lower.includes('timeline') || lower.includes('how long') || lower.includes('duration') || lower.includes('complete')) {
+      return `${salutation}the design timeline is planned after reviewing the project size, scope, approvals required, and level of detailing. ${memory?.plotArea ? `For your *${memory.plotArea}* project` : 'For your project'}, our architect can outline a realistic design-and-approval programme once we know the location and requirements. Would you like us to arrange that discussion?`;
+    }
+
+    if (lower.includes('size') || lower.includes('area') || lower.includes('plot dimension') || lower.includes('plot size')) {
+      return `${salutation}we can work with compact plots through larger residences and commercial spaces. Please share the plot dimensions or built-up area (for example, 30×50 ft, 200 sq yd, or 2,500 sq ft), and we will advise on the most suitable planning approach.`;
+    }
+
+    if (lower.includes('location') || lower.includes('city') || lower.includes('where are you')) {
+      return `${salutation}ARC 11 Architect works across Delhi NCR and Pan-India. Share your site city or locality so our team can account for local conditions and applicable approval requirements—without promising any specific municipal outcome.`;
     }
 
     if (lower.includes('3d') || lower.includes('elevation') || lower.includes('render') || lower.includes('walkthrough')) {
