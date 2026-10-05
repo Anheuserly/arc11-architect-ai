@@ -1,9 +1,12 @@
 import { prisma } from '@/lib/prisma';
+import { ClientMemoryService, ClientProfileMemory } from './client-memory';
 
 export interface AiGeneratorOptions {
   userMessage: string;
   conversationHistory?: Array<{ role: string; content: string }>;
   contextCategory?: string;
+  clientMemory?: ClientProfileMemory;
+  contactName?: string;
 }
 
 export class AiEngineService {
@@ -43,7 +46,7 @@ export class AiEngineService {
   }
 
   /**
-   * Generates grounded response adhering strictly to AI Safety Rules
+   * Generates grounded response adhering strictly to AI Safety Rules with Persistent Memory injection
    */
   public static async generateResponse(options: AiGeneratorOptions): Promise<string> {
     const provider = process.env.AI_PROVIDER || 'mock-rules';
@@ -51,17 +54,35 @@ export class AiEngineService {
 
     const knowledgeContext = await this.retrieveKnowledgeContext(options.userMessage);
 
-    const systemPrompt = `You are the official automated assistant for "ARC 11 Architect", a premier architectural, interior design, and planning consultancy.
+    let memoryContext = '';
+    if (options.clientMemory) {
+      const m = options.clientMemory;
+      const memLines: string[] = [];
+      if (options.contactName) memLines.push(`Client Name: ${options.contactName}`);
+      if (m.location) memLines.push(`Location/City: ${m.location}`);
+      if (m.projectType) memLines.push(`Project Type: ${m.projectType}`);
+      if (m.plotArea) memLines.push(`Plot Area: ${m.plotArea}`);
+      if (m.budget) memLines.push(`Budget: ${m.budget}`);
+      if (m.stylePreferences && m.stylePreferences.length > 0) memLines.push(`Design Style Preferences: ${m.stylePreferences.join(', ')}`);
+      if (m.likes && m.likes.length > 0) memLines.push(`Client Likes/Special Requirements: ${m.likes.join(', ')}`);
+      if (m.dislikes && m.dislikes.length > 0) memLines.push(`Client Dislikes/Things to Avoid: ${m.dislikes.join(', ')}`);
+
+      if (memLines.length > 0) {
+        memoryContext = `\nRECALLED CLIENT MEMORY & PREFERENCES:\n${memLines.map(l => `- ${l}`).join('\n')}\n(Use this memory to provide deeply personalized answers. Acknowledge their known preferences when relevant.)\n`;
+      }
+    }
+
+    const systemPrompt = `You are the official automated architectural consultant for "ARC 11 Architect", a premier architectural, interior design, and planning consultancy based in India (Delhi NCR / Pan-India).
 You operate on WhatsApp representing ARC 11 Architect.
 
 STRICT SAFETY AND FIDELITY RULES:
 1. Always identify as ARC 11 Architect.
-2. NEVER invent prices, rates, fee structures, or guarantees.
+2. NEVER invent exact prices, rates, fee structures, or construction costs.
 3. NEVER fabricate credentials, project history, or licenses.
 4. If asked about exact costs, explain that architectural fees depend on site area, scope of drawings, and municipal guidelines, and offer to arrange an architect consultation.
 5. Keep responses concise, warm, professional, and easy to read on WhatsApp (use bullet points or numbered lists where helpful).
-6. Ground your answers strictly in the provided official knowledge. If uncertain, state clearly: "I don't have enough specific details on that right now. Let me connect you with an ARC 11 Architect team member."
-
+6. Ground your answers strictly in the provided official knowledge.
+${memoryContext}
 ${knowledgeContext}`;
 
     // If OpenAI API key is supplied, call OpenAI
@@ -94,23 +115,32 @@ ${knowledgeContext}`;
       }
     }
 
-    // Default High-Fidelity Rule-Based Knowledge Engine
-    return this.generateRuleBasedFallback(options.userMessage);
+    // Smart Rule-Based & Knowledge Engine with Memory Personalization
+    return this.generateMemoryAwareRuleResponse(options.userMessage, options.clientMemory, options.contactName);
   }
 
-  private static generateRuleBasedFallback(text: string): string {
+  private static generateMemoryAwareRuleResponse(
+    text: string, 
+    memory?: ClientProfileMemory,
+    clientName?: string
+  ): string {
     const lower = text.toLowerCase();
+    const salutation = clientName && clientName !== 'Valued Client' ? `${clientName}, ` : '';
+
+    // If client has recognized style or location in memory
+    const knownStyle = memory?.stylePreferences?.[0];
+    const knownLoc = memory?.location;
 
     if (lower.includes('price') || lower.includes('cost') || lower.includes('rate') || lower.includes('quote') || lower.includes('fee')) {
-      return 'At ARC 11 Architect, architectural and design fees depend on site parameters, built-up area, and drawing requirements.\n\nWe provide tailored proposals after reviewing your site details. Would you like to share your project location and plot area to get started?';
+      return `${salutation}at ARC 11 Architect, architectural and design fees depend on site parameters, built-up area, and drawing requirements.\n\nWe provide tailored proposals after reviewing your site details. ${knownLoc ? `Since your project is in *${knownLoc}*, our team can prepare a site-specific proposal.` : 'Would you like to share your project location and plot area to get started?'}`;
     }
 
     if (lower.includes('3d') || lower.includes('elevation') || lower.includes('render') || lower.includes('walkthrough')) {
-      return 'Yes! We create high-resolution 3D exterior elevations, daytime & evening lighting views, and realistic 3D interior walkthroughs so you can visualize your project before construction starts.';
+      return `Yes${salutation ? `, ${salutation.replace(', ', '')}` : ''}! We create high-resolution 3D exterior elevations, daytime & evening lighting views, and realistic 3D interior walkthroughs so you can visualize your project before construction starts.${knownStyle ? ` We can render this in your preferred *${knownStyle}* theme.` : ''}`;
     }
 
     if (lower.includes('interior') || lower.includes('decor') || lower.includes('furniture')) {
-      return 'Our interior design services cover turnkey residential and commercial spaces, including space planning, custom furniture detailing, false ceilings, lighting layouts, and curated material finishes.';
+      return `Our interior design services cover turnkey residential and commercial spaces, including space planning, custom furniture detailing, false ceilings, lighting layouts, and curated material finishes.${knownStyle ? ` We specialize in *${knownStyle}* interiors tailored to your taste.` : ''}`;
     }
 
     if (lower.includes('commercial') || lower.includes('office') || lower.includes('retail')) {
@@ -118,9 +148,18 @@ ${knowledgeContext}`;
     }
 
     if (lower.includes('portfolio') || lower.includes('work') || lower.includes('projects')) {
-      return 'We have designed luxury villas, duplex homes, modern apartments, corporate workspaces, and renovation projects across the region. Share your project type and our team will share relevant portfolio references.';
+      return `We have designed luxury villas, duplex homes, modern apartments, corporate workspaces, and renovation projects across Delhi NCR and beyond. ${knownStyle ? `We would love to share projects featuring *${knownStyle}* concepts.` : 'Share your project type and our team will share relevant portfolio references.'}`;
     }
 
-    return 'Thank you for reaching out to ARC 11 Architect. We are dedicated to delivering thoughtful architecture and interior solutions.\n\nPlease let us know what you would like to explore or reply "Menu" to see our core services.';
+    // If client shared specific architectural project intent in general text
+    if (lower.includes('design') || lower.includes('villa') || lower.includes('bhk') || lower.includes('house') || lower.includes('plot') || lower.includes('construct')) {
+      let ack = `Thank you${salutation ? ` ${salutation.replace(', ', '')}` : ''} for sharing your vision with ARC 11 Architect.`;
+      if (knownStyle) ack += ` We have noted your preference for *${knownStyle}* architecture.`;
+      if (knownLoc) ack += ` Location: *${knownLoc}*.`;
+      ack += `\n\nOur team has recorded these requirements in our project pipeline. An architect will reach out to discuss your floor plan and initial design concepts.\n\nFeel free to share any sketches, floor plans, or reference photos right here!`;
+      return ack;
+    }
+
+    return `Thank you for reaching out to ARC 11 Architect. We are dedicated to delivering thoughtful architecture and interior solutions.\n\nPlease let us know what you would like to explore or reply "Menu" to see our core services.`;
   }
 }

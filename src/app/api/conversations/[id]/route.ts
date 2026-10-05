@@ -104,6 +104,16 @@ export async function POST(
         data: { lastMessageAt: new Date() },
       });
 
+      if (!sendResult.success) {
+        const metaErrMsg = sendResult.error?.error?.message || sendResult.error?.message || 'Meta Cloud API rejected outbound delivery';
+        return NextResponse.json({
+          success: false,
+          error: `WhatsApp Delivery Failed: ${metaErrMsg}`,
+          metaError: sendResult.error,
+          data: message,
+        }, { status: 422 });
+      }
+
       return NextResponse.json({ success: true, data: message });
     }
 

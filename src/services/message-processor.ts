@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { WhatsAppClient } from './whatsapp-client';
 import { AiEngineService } from './ai-engine';
+import { ClientMemoryService, ClientProfileMemory } from './client-memory';
 import { ConversationStatus, MessageDirection, MessageDeliveryStatus } from '@prisma/client';
 
 export interface ProcessIncomingMessageParams {
@@ -29,7 +30,7 @@ export class MessageProcessorService {
       return;
     }
 
-    // 2. Fetch or Create Contact
+    // 2. Fetch or Create Contact (Auto-add new contacts to the portal)
     const cleanPhone = fromPhone.replace(/[^\d]/g, '');
     let contact = await prisma.contact.findUnique({
       where: { waId: cleanPhone },
@@ -43,8 +44,9 @@ export class MessageProcessorService {
           name: senderName || 'Valued Client',
         },
       });
+      console.log(`[MessageProcessor] New contact registered: ${cleanPhone} (${contact.name})`);
     } else if (senderName && contact.name !== senderName && contact.name === 'Valued Client') {
-      await prisma.contact.update({
+      contact = await prisma.contact.update({
         where: { id: contact.id },
         data: { name: senderName },
       });
@@ -69,12 +71,13 @@ export class MessageProcessorService {
         include: { states: true },
       });
     } else {
-      await prisma.conversation.update({
+      conversation = await prisma.conversation.update({
         where: { id: conversation.id },
         data: {
           unreadCount: { increment: 1 },
           lastMessageAt: new Date(),
         },
+        include: { states: true },
       });
     }
 
@@ -92,17 +95,25 @@ export class MessageProcessorService {
       },
     });
 
-    // 5. If Human Mode is Active, do not auto-respond
+    // 5. Intelligent Client Memory & Preference Extraction
+    // Automatically remembers style likes, dislikes, location, plot size, budget
+    const memory = await ClientMemoryService.recordInteractionMemory(contact.id, body);
+
+    // 6. Automatic Lead Qualification from Freeform Conversation
+    await ClientMemoryService.autoCaptureLeadIfApplicable(contact.id, body);
+
+    // 7. If Human Mode is Active, do not auto-respond
     if (conversation.status === ConversationStatus.HUMAN_ACTIVE || conversation.status === ConversationStatus.HUMAN_REQUIRED) {
       console.log(`[MessageProcessor] Conversation ${conversation.id} is in human mode. Auto-response paused.`);
       return;
     }
 
-    // 6. Execute Rule-Based Automation & State Flow
+    // 8. Execute Intelligent Automation Flow with Memory Awareness
     await this.handleAutomationFlow({
       contact,
       conversation,
       body: body.trim(),
+      clientMemory: memory,
     });
   }
 
@@ -113,8 +124,9 @@ export class MessageProcessorService {
     contact: any;
     conversation: any;
     body: string;
+    clientMemory: ClientProfileMemory;
   }): Promise<void> {
-    const { contact, conversation, body } = ctx;
+    const { contact, conversation, body, clientMemory } = ctx;
     const lower = body.toLowerCase();
 
     // TRIGGER A: Human Escalation Request
@@ -140,7 +152,7 @@ export class MessageProcessorService {
       });
 
       const responseText =
-        'You are now connected with our human support queue.\n\nAn ARC 11 Architect team member has been notified and will review your conversation shortly.';
+        'You are now connected with our human design queue.\n\nAn ARC 11 Architect senior partner has been notified and will review your conversation shortly.';
       await this.sendAndRecordReply(conversation.id, contact.phoneNumber, responseText);
       return;
     }
@@ -172,7 +184,7 @@ export class MessageProcessorService {
       const val = settings?.value as any;
       const welcomeText =
         val?.greetingText ||
-        'Welcome to ARC 11 Architect.\n\nWe provide professional architectural and design solutions for residential, commercial and bespoke projects.\n\nHow can we help you today?\n\n1. Architecture & Planning\n2. Interior Design\n3. 3D Visualization\n4. Residential Projects\n5. Commercial Projects\n6. Renovation & Remodeling\n7. Start a New Project\n8. Book a Consultation\n9. Portfolio\n10. Talk to Our Team';
+        'Welcome to ARC 11 Architect.\n\nWe provide professional architectural and interior solutions for residential, commercial and bespoke projects.\n\nHow can we help you today?\n\n1. Architecture & Planning\n2. Interior Design\n3. 3D Visualization\n4. Residential Projects\n5. Commercial Projects\n6. Renovation & Remodeling\n7. Start a New Project\n8. Book a Consultation\n9. Portfolio\n10. Talk to Our Team';
 
       await this.sendAndRecordReply(conversation.id, contact.phoneNumber, welcomeText);
       return;
@@ -252,9 +264,23 @@ export class MessageProcessorService {
       return;
     }
 
-    // TRIGGER F: Knowledge Base / AI Layer Response
+    // Fetch past conversation messages for AI history
+    const recentMessages = await prisma.message.findMany({
+      where: { conversationId: conversation.id },
+      orderBy: { createdAt: 'desc' },
+      take: 6,
+    });
+    const conversationHistory = recentMessages.reverse().map(m => ({
+      role: m.direction === MessageDirection.INBOUND ? 'user' : 'assistant',
+      content: m.body || '',
+    }));
+
+    // TRIGGER F: Knowledge Base / AI Layer Response with Persistent Memory
     const aiAnswer = await AiEngineService.generateResponse({
       userMessage: body,
+      conversationHistory,
+      clientMemory,
+      contactName: contact.name || undefined,
     });
     await this.sendAndRecordReply(conversation.id, contact.phoneNumber, aiAnswer);
   }
@@ -357,6 +383,12 @@ export class MessageProcessorService {
           },
         });
       }
+
+      // Record in client memory
+      await ClientMemoryService.recordInteractionMemory(
+        contact.id,
+        `Location: ${data.location}, Plot: ${data.plotArea}, Floors: ${data.floors}, Style: ${data.requirements}`
+      );
 
       // Reset state machine
       await prisma.conversationState.update({

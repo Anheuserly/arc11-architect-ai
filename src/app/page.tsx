@@ -1,17 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Building2, MessageSquare, Users, ShieldAlert, Award, FileText, 
-  Send, Bot, RefreshCw, Phone, Clock, Calendar, CheckCircle2,
-  Sparkles, SlidersHorizontal, ArrowUpRight, Search, PlusCircle,
-  Database, UserCheck
+  Send, Bot, RefreshCw, Search, PlusCircle, UserCheck, Phone
 } from 'lucide-react';
 
 export default function DashboardPage() {
-  const [activeTab, setActiveTab] = useState<'inbox' | 'leads' | 'services' | 'faqs' | 'broadcast'>('inbox');
+  const [activeTab, setActiveTab] = useState<'inbox' | 'contacts' | 'leads' | 'services' | 'faqs' | 'broadcast'>('inbox');
   const [conversations, setConversations] = useState<any[]>([]);
+  const [contacts, setContacts] = useState<any[]>([]);
   const [selectedChat, setSelectedChat] = useState<any>(null);
+  const selectedChatRef = useRef<any>(null);
+  selectedChatRef.current = selectedChat;
+
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [replyText, setReplyText] = useState('');
   const [leads, setLeads] = useState<any[]>([]);
@@ -19,6 +21,8 @@ export default function DashboardPage() {
   const [faqs, setFaqs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [contactSearchQuery, setContactSearchQuery] = useState('');
+  const [sendErrorMessage, setSendErrorMessage] = useState<string | null>(null);
 
   // Quick Dispatch / Broadcast & Testing Modal State
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
@@ -29,23 +33,7 @@ export default function DashboardPage() {
   const [isSimulateInbound, setIsSimulateInbound] = useState(false);
   const [testStatus, setTestStatus] = useState<string | null>(null);
 
-  // Load conversations
-  const loadConversations = async () => {
-    try {
-      const res = await fetch('/api/conversations');
-      const data = await res.json();
-      if (data.success) {
-        setConversations(data.data);
-        if (!selectedChat && data.data.length > 0) {
-          loadChatDetail(data.data[0].id);
-        }
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const loadChatDetail = async (id: string) => {
+  const loadChatDetail = useCallback(async (id: string) => {
     try {
       const res = await fetch(`/api/conversations/${id}`);
       const data = await res.json();
@@ -56,9 +44,35 @@ export default function DashboardPage() {
     } catch (e) {
       console.error(e);
     }
-  };
+  }, []);
 
-  const loadLeads = async () => {
+  // Load conversations
+  const loadConversations = useCallback(async () => {
+    try {
+      const res = await fetch('/api/conversations');
+      const data = await res.json();
+      if (data.success) {
+        setConversations(data.data);
+        if (!selectedChatRef.current && data.data.length > 0) {
+          loadChatDetail(data.data[0].id);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, [loadChatDetail]);
+
+  const loadContacts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/contacts');
+      const data = await res.json();
+      if (data.success) setContacts(data.data);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  const loadLeads = useCallback(async () => {
     try {
       const res = await fetch('/api/leads');
       const data = await res.json();
@@ -66,9 +80,9 @@ export default function DashboardPage() {
     } catch (e) {
       console.error(e);
     }
-  };
+  }, []);
 
-  const loadServices = async () => {
+  const loadServices = useCallback(async () => {
     try {
       const res = await fetch('/api/services');
       const data = await res.json();
@@ -76,9 +90,9 @@ export default function DashboardPage() {
     } catch (e) {
       console.error(e);
     }
-  };
+  }, []);
 
-  const loadFaqs = async () => {
+  const loadFaqs = useCallback(async () => {
     try {
       const res = await fetch('/api/faqs');
       const data = await res.json();
@@ -86,18 +100,32 @@ export default function DashboardPage() {
     } catch (e) {
       console.error(e);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadConversations();
+    loadContacts();
     loadLeads();
     loadServices();
     loadFaqs();
-  }, []);
+  }, [loadConversations, loadContacts, loadLeads, loadServices, loadFaqs]);
+
+  // Real-Time Polling Hook: Auto-refreshes conversations and currently viewed chat every 3 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadConversations();
+      if (selectedChatRef.current?.id) {
+        loadChatDetail(selectedChatRef.current.id);
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [loadConversations, loadChatDetail]);
 
   const handleSendMessage = async () => {
     if (!replyText.trim() || !selectedChat) return;
     setLoading(true);
+    setSendErrorMessage(null);
     try {
       const res = await fetch(`/api/conversations/${selectedChat.id}`, {
         method: 'POST',
@@ -109,7 +137,11 @@ export default function DashboardPage() {
         setReplyText('');
         loadChatDetail(selectedChat.id);
         loadConversations();
+      } else {
+        setSendErrorMessage(data.error || 'Failed to send WhatsApp message via Meta Cloud API.');
       }
+    } catch {
+      setSendErrorMessage('Network error while attempting to send message.');
     } finally {
       setLoading(false);
     }
@@ -225,6 +257,25 @@ export default function DashboardPage() {
                 activeTab === 'inbox' ? 'bg-[#9b6843]/10 text-[#9b6843]' : 'bg-[#42382c]/5 text-[#6b645c]'
               }`}>
                 {conversations.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('contacts')}
+              className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-medium transition ${
+                activeTab === 'contacts' 
+                  ? 'bg-white text-[#9b6843] shadow-sm border border-[#42382c]/10 font-semibold' 
+                  : 'text-[#6b645c] hover:bg-white/60 hover:text-[#1c1a17]'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <UserCheck className="h-4 w-4 stroke-[2]" />
+                <span>Clients & Contacts</span>
+              </div>
+              <span className={`text-[11px] px-2 py-0.5 rounded-full font-mono ${
+                activeTab === 'contacts' ? 'bg-[#9b6843]/10 text-[#9b6843]' : 'bg-[#42382c]/5 text-[#6b645c]'
+              }`}>
+                {contacts.length}
               </span>
             </button>
 
@@ -436,6 +487,22 @@ export default function DashboardPage() {
                     ))}
                   </div>
 
+                  {/* Delivery Error Notice */}
+                  {sendErrorMessage && (
+                    <div className="px-4 py-2.5 mx-4 mb-2 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">⚠️</span>
+                        <span>{sendErrorMessage}</span>
+                      </div>
+                      <button 
+                        onClick={() => setSendErrorMessage(null)}
+                        className="text-rose-500 hover:text-rose-700 font-bold ml-2 text-xs"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+
                   {/* Reply Input Dock */}
                   <div className="p-4 border-t border-[#42382c]/10 bg-white/90 backdrop-blur-sm flex items-center gap-3">
                     <input
@@ -479,7 +546,113 @@ export default function DashboardPage() {
                     <div>
                       <span className="text-[#a8a096]">Registered:</span> <span className="text-[#6b645c]">{new Date(selectedChat.contact?.createdAt).toLocaleDateString()}</span>
                     </div>
+                    {selectedChat.contact?.city && (
+                      <div>
+                        <span className="text-[#a8a096]">Location:</span> <span className="text-[#1c1a17] font-medium">{selectedChat.contact.city}</span>
+                      </div>
+                    )}
                   </div>
+                </div>
+
+                {/* AI Client Memory & Preference Profile */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#9b6843] flex items-center gap-1.5">
+                      <Bot className="h-3.5 w-3.5 text-[#9b6843]" />
+                      <span>AI Architectural Memory</span>
+                    </h4>
+                    <span className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
+                      Active Profile
+                    </span>
+                  </div>
+                  {(() => {
+                    let mem: any = null;
+                    try {
+                      if (selectedChat.contact?.notes?.startsWith('{')) {
+                        mem = JSON.parse(selectedChat.contact.notes);
+                      }
+                    } catch {
+                      mem = null;
+                    }
+                    const hasMemory = mem && (
+                      mem.projectType || 
+                      mem.location || 
+                      mem.plotArea || 
+                      mem.budget || 
+                      (mem.stylePreferences && mem.stylePreferences.length > 0) ||
+                      (mem.likes && mem.likes.length > 0) ||
+                      (mem.dislikes && mem.dislikes.length > 0)
+                    );
+
+                    if (!hasMemory) {
+                      return (
+                        <div className="p-4 bg-white/60 rounded-xl border border-dashed border-[#42382c]/15 text-xs text-[#a8a096] italic text-center">
+                          AI will automatically memorize preferences, likes, and architectural requirements as the client chats.
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="p-4 bg-white rounded-2xl border border-amber-200/80 text-xs space-y-3 shadow-xs">
+                        {mem.projectType && (
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-[#9b6843] tracking-wide block">Preferred Project:</span>
+                            <span className="font-semibold text-[#1c1a17]">{mem.projectType}</span>
+                          </div>
+                        )}
+                        {mem.plotArea && (
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-[#9b6843] tracking-wide block">Plot / Size:</span>
+                            <span className="text-[#1c1a17] font-medium">{mem.plotArea}</span>
+                          </div>
+                        )}
+                        {mem.budget && (
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-[#9b6843] tracking-wide block">Budget:</span>
+                            <span className="text-[#1c1a17] font-medium">{mem.budget}</span>
+                          </div>
+                        )}
+                        {mem.stylePreferences && mem.stylePreferences.length > 0 && (
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-[#9b6843] tracking-wide block mb-1">Architectural Styles:</span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {mem.stylePreferences.map((s: string, i: number) => (
+                                <span key={i} className="text-[10px] px-2 py-0.5 bg-[#9b6843]/10 text-[#9b6843] rounded-md font-medium">
+                                  {s}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {mem.likes && mem.likes.length > 0 && (
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-emerald-700 tracking-wide block mb-1">Likes / Must-Haves:</span>
+                            <ul className="space-y-1 text-[11px] text-[#1c1a17]">
+                              {mem.likes.map((like: string, i: number) => (
+                                <li key={i} className="flex items-start gap-1.5">
+                                  <span className="text-emerald-600 font-bold">✓</span>
+                                  <span>{like}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {mem.dislikes && mem.dislikes.length > 0 && (
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-rose-700 tracking-wide block mb-1">Dislikes / Avoid:</span>
+                            <ul className="space-y-1 text-[11px] text-[#1c1a17]">
+                              {mem.dislikes.map((dislike: string, i: number) => (
+                                <li key={i} className="flex items-start gap-1.5">
+                                  <span className="text-rose-600 font-bold">✕</span>
+                                  <span>{dislike}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div>
@@ -510,6 +683,123 @@ export default function DashboardPage() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Clients & Contacts Tab */}
+        {activeTab === 'contacts' && (
+          <div className="p-8 overflow-y-auto flex-1 max-w-7xl mx-auto w-full">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="font-display text-2xl font-bold text-[#1c1a17]">Clients & Contacts Directory</h2>
+                <p className="text-xs text-[#6b645c] mt-1">Every user who connects with ARC 11 Architect via WhatsApp is automatically added here</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <Search className="h-3.5 w-3.5 absolute left-3 top-3 text-[#a8a096]" />
+                  <input
+                    type="text"
+                    placeholder="Search contacts..."
+                    value={contactSearchQuery}
+                    onChange={(e) => setContactSearchQuery(e.target.value)}
+                    className="bg-white border border-[#42382c]/10 rounded-xl pl-8 pr-3 py-2 text-xs text-[#1c1a17] focus:outline-none focus:border-[#9b6843] w-64 shadow-xs"
+                  />
+                </div>
+                <button 
+                  onClick={loadContacts} 
+                  className="px-4 py-2 bg-white border border-[#42382c]/10 rounded-xl text-xs font-medium text-[#1c1a17] hover:bg-[#f4ede3] flex items-center gap-2 shadow-xs transition"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" /> Refresh
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {contacts
+                .filter((c) => {
+                  const q = contactSearchQuery.toLowerCase();
+                  return (
+                    !q ||
+                    (c.name && c.name.toLowerCase().includes(q)) ||
+                    (c.phoneNumber && c.phoneNumber.includes(q)) ||
+                    (c.city && c.city.toLowerCase().includes(q))
+                  );
+                })
+                .map((c) => {
+                  const latestMsg = c.conversations?.[0]?.messages?.[0];
+                  const hasLead = c.leads && c.leads.length > 0;
+                  return (
+                    <div key={c.id} className="p-6 bg-white border border-[#42382c]/10 rounded-2xl space-y-4 shadow-xs hover:shadow-md transition flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full bg-[#ebdccf] flex items-center justify-center text-[#9b6843] font-bold text-sm">
+                              {c.name ? c.name[0] : 'C'}
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-sm text-[#1c1a17]">{c.name || 'Valued Client'}</h3>
+                              <p className="text-xs text-[#6b645c] font-mono flex items-center gap-1 mt-0.5">
+                                <Phone className="h-3 w-3 text-[#9b6843]" /> +{c.phoneNumber}
+                              </p>
+                            </div>
+                          </div>
+                          <span className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-full ${
+                            hasLead ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          }`}>
+                            {hasLead ? 'Client & Lead' : 'Connected'}
+                          </span>
+                        </div>
+
+                        <div className="text-xs space-y-2 p-3.5 bg-[#f7f3ec] rounded-xl border border-[#42382c]/5 text-[#6b645c]">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span>First Connected:</span>
+                            <span className="font-mono text-[#1c1a17]">{new Date(c.createdAt).toLocaleDateString()}</span>
+                          </div>
+                          {latestMsg && (
+                            <div className="text-[11px] pt-1 border-t border-[#42382c]/10">
+                              <span className="text-[#a8a096]">Latest: </span>
+                              <span className="text-[#1c1a17] truncate inline-block max-w-[200px] align-bottom">
+                                &quot;{latestMsg.body}&quot;
+                              </span>
+                            </div>
+                          )}
+                          {hasLead && (
+                            <div className="text-[11px] pt-1 text-[#9b6843] font-medium">
+                              🏢 Project: {c.leads[0].projectType} ({c.leads[0].location || 'NCR'})
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="pt-2 flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            const matchedConv = conversations.find((conv) => conv.contactId === c.id);
+                            if (matchedConv) {
+                              setActiveTab('inbox');
+                              loadChatDetail(matchedConv.id);
+                            } else {
+                              setTestPhone(`+${c.phoneNumber}`);
+                              setTestRecipientName(c.name || '');
+                              setIsTestModalOpen(true);
+                            }
+                          }}
+                          className="flex-1 py-2 px-3 bg-[#9b6843] hover:bg-[#835534] text-white rounded-xl text-xs font-medium transition text-center shadow-xs flex items-center justify-center gap-1.5"
+                        >
+                          <MessageSquare className="h-3.5 w-3.5" />
+                          <span>Open Dialogue</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+              {contacts.length === 0 && (
+                <div className="col-span-full py-16 text-center text-[#a8a096] text-xs">
+                  No contacts found yet. Anyone who chats on WhatsApp (+91 93118 47555) will automatically appear here.
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -656,17 +946,24 @@ export default function DashboardPage() {
                 />
               </div>
 
-              <div className="p-3 bg-[#ebdccf]/40 rounded-xl border border-[#9b6843]/20 flex items-center justify-between">
-                <div>
-                  <div className="font-semibold text-[#1c1a17]">Simulate Incoming Customer Message</div>
-                  <div className="text-[11px] text-[#6b645c]">Triggers ARC 11 automation and lead capture flow</div>
+              <div className="p-3 bg-[#ebdccf]/40 rounded-xl border border-[#9b6843]/20 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold text-[#1c1a17]">Simulate Inbound Customer Message</div>
+                    <div className="text-[11px] text-[#6b645c]">Add as client message & trigger ARC 11 AI automation & pipeline capture</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={isSimulateInbound}
+                    onChange={(e) => setIsSimulateInbound(e.target.checked)}
+                    className="h-4 w-4 accent-[#9b6843]"
+                  />
                 </div>
-                <input
-                  type="checkbox"
-                  checked={isSimulateInbound}
-                  onChange={(e) => setIsSimulateInbound(e.target.checked)}
-                  className="h-4 w-4 accent-[#9b6843]"
-                />
+                {!isSimulateInbound && (
+                  <p className="text-[10px] text-[#6b645c] border-t border-[#42382c]/10 pt-1.5 leading-relaxed">
+                    💡 <strong>Direct Outbound via Meta:</strong> Meta WhatsApp Cloud API requires client to have initiated a chat within 24h, or use an approved template. You cannot send freeform text to the business phone number itself (+91 93118 47555).
+                  </p>
+                )}
               </div>
 
               <div>

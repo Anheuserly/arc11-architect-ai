@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { WhatsAppClient } from '@/services/whatsapp-client';
-import { ConversationStatus, MessageDeliveryStatus, MessageDirection } from '@prisma/client';
+import { ConversationStatus } from '@prisma/client';
 
 export async function GET(request: NextRequest) {
   try {
