@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
         for (const message of value.messages || []) {
           const type = message.type || 'text';
           const body = type === 'text' ? message.text?.body || ''
-            : type === 'interactive' ? message.interactive?.button_reply?.title || message.interactive?.list_reply?.title || ''
+            : type === 'interactive' ? message.interactive?.button_reply?.title || message.interactive?.list_reply?.title || message.interactive?.button_reply?.id || message.interactive?.list_reply?.id || ''
             : type === 'location' ? `Location shared: Lat ${message.location?.latitude}, Lng ${message.location?.longitude}`
             : `[${type.toUpperCase()} message received]`;
           await MessageProcessorService.processIncomingMessage({

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { WhatsAppClient } from './whatsapp-client';
 import { AiEngineService } from './ai-engine';
 import { ClientMemoryService, ClientProfileMemory } from './client-memory';
+import { ARC11_CATALOG_URL, ARC11_SERVICE_CATALOG } from './service-catalog';
 import { ConversationStatus, MessageDirection, MessageDeliveryStatus } from '@prisma/client';
 
 export interface ProcessIncomingMessageParams {
@@ -203,7 +204,7 @@ export class MessageProcessorService {
       const val = settings?.value as any;
       const welcomeText =
         val?.greetingText ||
-        'Welcome to ARC 11 Architect.\n\nWe provide professional architectural and interior solutions for residential, commercial and bespoke projects.\n\nHow can we help you today?\n\n1. Architecture & Planning\n2. Interior Design\n3. 3D Visualization\n4. Residential Projects\n5. Commercial Projects\n6. Renovation & Remodeling\n7. Start a New Project\n8. Book a Consultation\n9. Portfolio\n10. Talk to Our Team';
+        'Welcome to ARC 11 Architect.\n\nWe provide professional architectural and interior solutions for residential, commercial and bespoke projects.\n\nHow can we help you today?\n\n1. Architecture & Planning\n2. Interior Design\n3. 3D Visualization\n4. Residential Projects\n5. Commercial Projects\n6. Renovation & Remodeling\n7. Start a New Project\n8. Book a Consultation\n9. Portfolio\n10. Talk to Our Team\n11. View Service Catalogue';
 
       await this.sendAndRecordReply(conversation.id, contact.phoneNumber, welcomeText);
       return;
@@ -270,6 +271,18 @@ export class MessageProcessorService {
       const text =
         '*ARC 11 Architect Portfolio*\n\nOur portfolio spans contemporary residences, modern duplexes, luxury commercial offices, and interior restorations.\n\nPlease share your project type (Residential or Commercial) and we will send relevant project case studies.';
       await this.sendAndRecordReply(conversation.id, contact.phoneNumber, text);
+      return;
+    }
+
+    if (
+      body === '11' ||
+      lower.includes('catalog') ||
+      lower.includes('catalogue') ||
+      lower.includes('services') ||
+      lower.includes('packages') ||
+      lower.includes('pricing')
+    ) {
+      await this.sendServiceCatalogue(conversation.id, contact.phoneNumber);
       return;
     }
 
@@ -471,6 +484,45 @@ export class MessageProcessorService {
         direction: MessageDirection.OUTBOUND,
         type: 'text',
         body: text,
+        deliveryStatus: sendResult.success ? MessageDeliveryStatus.SENT : MessageDeliveryStatus.FAILED,
+        senderType: 'bot',
+      },
+    });
+  }
+
+  /**
+   * A WhatsApp interactive list works immediately, including before the native
+   * Meta Commerce catalogue is connected to the WABA. The public catalogue URL
+   * remains available as a no-friction fallback on every WhatsApp client.
+   */
+  private static async sendServiceCatalogue(conversationId: string, toPhone: string): Promise<void> {
+    const summary =
+      `*ARC 11 Architect Service Catalogue*\n\nChoose a service below, or view the complete catalogue: ${ARC11_CATALOG_URL}`;
+    const sendResult = await WhatsAppClient.sendMessage({
+      to: toPhone,
+      type: 'interactive',
+      interactive: {
+        type: 'list',
+        header: { type: 'text', text: 'ARC 11 Services' },
+        body: { text: 'Choose a service and we will guide you to the right next step.' },
+        footer: { text: 'ARC 11 Architect' },
+        action: {
+          button: 'View services',
+          sections: [{
+            title: 'Professional services',
+            rows: ARC11_SERVICE_CATALOG,
+          }],
+        },
+      },
+    });
+
+    await prisma.message.create({
+      data: {
+        conversationId,
+        wamid: sendResult.wamid || `out_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        direction: MessageDirection.OUTBOUND,
+        type: 'interactive',
+        body: summary,
         deliveryStatus: sendResult.success ? MessageDeliveryStatus.SENT : MessageDeliveryStatus.FAILED,
         senderType: 'bot',
       },
