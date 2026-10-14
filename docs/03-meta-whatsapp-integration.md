@@ -6,22 +6,24 @@ ARC 11 Architect operates officially on the Meta WhatsApp Cloud API (Graph API v
 
 ## 🔑 Meta Credentials & Environment Variables
 
-These variables are defined in `.env`:
+These variables are defined only in the deployment environment (or local ignored
+`.env`). Never paste their real values into source control, documentation, issue
+trackers, or chat messages.
 
 ```env
-# Meta App & Account IDs
-META_APP_ID="1366869258359438"
-META_APP_SECRET="5fa2f7f41f89ac2cc36b6f0ee4238014"
-META_ACCESS_TOKEN="EAATbKQyZAUo4BSrWN3Cla0ZCNqumdqo8vkHYZCFbZCtEf9RDiG2DPtXZAsn6foroOIySYffzJqqll8dyQerVdDVyio7T7kUV0DXCFGBoJp3aX1PXEAf0s4RQamSQ8sInQ1aI2ZAt9TInOgQuK9Te47kC7aN3tCJFQvGoJ44GSLfzfmsy6SsNIiDWPr4NUPewZDZD"
+# Meta App & Account IDs / secrets
+META_APP_ID="YOUR_META_APP_ID"
+META_APP_SECRET="YOUR_META_APP_SECRET"
+META_ACCESS_TOKEN="YOUR_SYSTEM_USER_ACCESS_TOKEN"
 
 # WhatsApp Business Account & Phone Number
-WHATSAPP_BUSINESS_ACCOUNT_ID="1427614785976785"
-WHATSAPP_PHONE_NUMBER_ID="1374779232381161"
-WHATSAPP_PHONE_DISPLAY="+91 93118 47555"
+WHATSAPP_BUSINESS_ACCOUNT_ID="YOUR_WABA_ID"
+WHATSAPP_PHONE_NUMBER_ID="YOUR_PHONE_NUMBER_ID"
+WHATSAPP_PHONE_DISPLAY="YOUR_BUSINESS_PHONE_NUMBER"
 
 # Webhook Verification
-WHATSAPP_VERIFY_TOKEN="arc11_architect_webhook_token_secure_2026"
-META_WEBHOOK_SECRET="5fa2f7f41f89ac2cc36b6f0ee4238014"
+WHATSAPP_VERIFY_TOKEN="GENERATE_A_RANDOM_VERIFY_TOKEN"
+META_WEBHOOK_SECRET="YOUR_META_APP_SECRET"
 ```
 
 ---
@@ -31,7 +33,7 @@ META_WEBHOOK_SECRET="5fa2f7f41f89ac2cc36b6f0ee4238014"
 To receive live inbound messages from customer mobile phones into the portal:
 
 1. **Callback URL:** `https://<your-public-domain-or-tunnel>/api/webhooks/whatsapp`
-2. **Verify Token:** `arc11_architect_webhook_token_secure_2026`
+2. **Verify Token:** the private value configured as `WHATSAPP_VERIFY_TOKEN`.
 3. **Webhook Subscribed Fields:**
    - `messages` (Mandatory: incoming texts, media, locations, button clicks)
    - `message_template_status_update`

@@ -29,6 +29,7 @@ It handles:
 | **[`04-ai-engine-and-client-memory.md`](./04-ai-engine-and-client-memory.md)** | Rule engine, LLM handoff, ClientMemoryService, memory serialization, and lead qualification. |
 | **[`05-api-reference.md`](./05-api-reference.md)** | Complete REST API endpoints (`/api/conversations`, `/api/contacts`, `/api/messages/send`, etc.). |
 | **[`06-current-state-and-next-steps.md`](./06-current-state-and-next-steps.md)** | Exact snapshot of what has been built, recent fixes, verified tests, live-integration blockers, deployment decision, and immediate next tasks. |
+| **[`07-security-and-secrets.md`](./07-security-and-secrets.md)** | Secret-handling rules, required production variables, and rotation procedure after exposure. |
 
 ---
 

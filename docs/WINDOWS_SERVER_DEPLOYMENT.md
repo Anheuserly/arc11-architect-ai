@@ -87,7 +87,7 @@ whatsapp.arc11architect.com {
 ### 7. Meta WhatsApp Cloud API Webhook Configuration
 1. Go to **Meta for Developers** -> Your App -> **WhatsApp** -> **Configuration**.
 2. **Callback URL**: `https://whatsapp.arc11architect.com/api/webhooks/whatsapp`
-3. **Verify Token**: Must match `WHATSAPP_VERIFY_TOKEN` in your `.env` (Default: `arc11_architect_webhook_token_secure_2026`).
+3. **Verify Token**: Must match the private `WHATSAPP_VERIFY_TOKEN` value in your server environment. Generate a unique random value; do not use a documented default.
 4. **Webhook Fields to Subscribe**:
    - `messages` (inbound messages from customers)
    - `message_status` (delivery & read receipts)

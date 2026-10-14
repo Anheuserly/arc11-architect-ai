@@ -3,8 +3,11 @@ import { prisma } from '@/lib/prisma';
 import { WhatsAppClient } from '@/services/whatsapp-client';
 import { MessageProcessorService } from '@/services/message-processor';
 import { ConversationStatus, MessageDeliveryStatus, MessageDirection } from '@prisma/client';
+import { requireAuthenticatedRequest } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
+  const unauthorized = requireAuthenticatedRequest(request);
+  if (unauthorized) return unauthorized;
   try {
     const body = await request.json();
     const { toPhone, recipientName, messageText, scheduleTime, isSimulateIncoming } = body;

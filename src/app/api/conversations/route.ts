@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { ConversationStatus } from '@prisma/client';
+import { requireAuthenticatedRequest } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
+  const unauthorized = requireAuthenticatedRequest(request);
+  if (unauthorized) return unauthorized;
   try {
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get('status');

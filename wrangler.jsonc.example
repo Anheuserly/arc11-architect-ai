@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "arc11-architect-ai",
+  "compatibility_date": "2026-10-14",
+  "observability": {
+    "enabled": true
+  },
+
+  // This is a secret-free reference template only. Do not rename it to
+  // wrangler.jsonc or deploy it until the documented Workers + PostgreSQL
+  // migration is complete. The current production recommendation is VPS +
+  // named Cloudflare Tunnel.
+  "vars": {
+    "NODE_ENV": "production",
+    "META_APP_ID": "YOUR_META_APP_ID",
+    "WHATSAPP_BUSINESS_ACCOUNT_ID": "YOUR_WABA_ID",
+    "WHATSAPP_PHONE_NUMBER_ID": "YOUR_PHONE_NUMBER_ID"
+  }
+
+  // Never place DATABASE_URL, JWT_SECRET, COOKIE_SECRET, Meta access tokens,
+  // Meta app secrets, or WHATSAPP_VERIFY_TOKEN in this file. Use provider
+  // secrets only after the Workers migration has been implemented and tested.
+}

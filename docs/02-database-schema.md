@@ -1,8 +1,9 @@
 # 02. Database Schema & Models
 
-The database is PostgreSQL hosted on a remote Windows VPS at:
+The database is PostgreSQL hosted on a remote Windows VPS. The connection string
+is an environment secret and must never be committed:
 ```env
-DATABASE_URL="postgresql://postgres:AnheVps2022@vps.amcmep.in:5432/arc11architect?schema=public&sslmode=prefer"
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/arc11architect?schema=public&sslmode=prefer"
 ```
 
 The schema is defined in [`prisma/schema.prisma`](../prisma/schema.prisma). Below are the core models and their responsibilities.

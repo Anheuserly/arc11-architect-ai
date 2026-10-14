@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAuthenticatedRequest } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
+  const unauthorized = requireAuthenticatedRequest(request);
+  if (unauthorized) return unauthorized;
   try {
     const services = await prisma.service.findMany({
       orderBy: { sortOrder: 'asc' },
@@ -13,6 +16,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const unauthorized = requireAuthenticatedRequest(request);
+  if (unauthorized) return unauthorized;
   try {
     const body = await request.json();
     const org = await prisma.organization.findFirst();

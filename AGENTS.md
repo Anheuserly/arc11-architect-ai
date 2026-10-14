@@ -145,3 +145,5 @@ Before starting complex tasks, review the detailed documents in `docs/`:
 - `docs/04-ai-engine-and-client-memory.md` — Deep dive into memory extraction & prompt injection.
 - `docs/05-api-reference.md` — Full REST API specifications.
 - `docs/06-current-state-and-next-steps.md` — Active task list and pending features.
+- `docs/07-security-and-secrets.md` — Required secret-handling and rotation process. Read before working with deployment configuration or credentials.
+- `wrangler.jsonc.example` — Safe, non-deployable Cloudflare configuration reference. It must not receive secrets or be enabled before the documented Workers/PostgreSQL migration is complete.

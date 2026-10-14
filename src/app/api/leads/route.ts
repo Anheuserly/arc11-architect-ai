@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAuthenticatedRequest } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
+  const unauthorized = requireAuthenticatedRequest(request);
+  if (unauthorized) return unauthorized;
   try {
     const leads = await prisma.lead.findMany({
       include: {

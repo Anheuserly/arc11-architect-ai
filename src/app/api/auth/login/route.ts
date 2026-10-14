@@ -2,15 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'arc11_secret';
+import { getJwtSecret, verifyPortalAccessKey } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json();
+    const { email, password, accessKey } = await request.json();
 
-    if (!email || !password) {
-      return NextResponse.json({ error: 'Email and password required' }, { status: 400 });
+    if (!email || !password || !accessKey) {
+      return NextResponse.json({ error: 'All access credentials are required' }, { status: 400 });
+    }
+
+    if (!verifyPortalAccessKey(accessKey)) {
+      return NextResponse.json({ error: 'Invalid access credentials' }, { status: 401 });
     }
 
     const member = await prisma.teamMember.findUnique({
@@ -35,7 +38,7 @@ export async function POST(request: NextRequest) {
         role: member.role,
         organizationId: member.organizationId,
       },
-      JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: '7d' }
     );
 

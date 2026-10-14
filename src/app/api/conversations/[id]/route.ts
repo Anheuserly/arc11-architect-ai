@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { WhatsAppClient } from '@/services/whatsapp-client';
 import { MessageDeliveryStatus, MessageDirection } from '@prisma/client';
+import { requireAuthenticatedRequest } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const unauthorized = requireAuthenticatedRequest(request);
+  if (unauthorized) return unauthorized;
   try {
     const { id } = await params;
     const conversation = await prisma.conversation.findUnique({
@@ -46,6 +49,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const unauthorized = requireAuthenticatedRequest(request);
+  if (unauthorized) return unauthorized;
   try {
     const { id } = await params;
     const body = await request.json();
