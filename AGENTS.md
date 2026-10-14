@@ -80,6 +80,35 @@ When reading or modifying code, refer to these core files:
 
 ---
 
+## 📍 Operational Memory — 2026-10-14
+
+This is the current operational handover. Keep it accurate as integrations are changed.
+
+### WhatsApp Delivery Status
+- The Meta webhook is implemented and has passed local signed-event and Meta "Test" event checks. The endpoint accepts the GET verification challenge and verifies `x-hub-signature-256` on POSTs.
+- The `messages` webhook field is subscribed. A Meta test event created a contact, conversation, and inbound message correctly; the corresponding outbound reply to Meta's example/test number failed as expected and must not be treated as a production delivery failure.
+- **Current live blocker:** the Meta app is unpublished and business verification is still in review. Meta does not deliver production WhatsApp messages to the app in this state. Publishing/verification is required before a real customer's message can reach the webhook.
+- During local testing, Meta needs a publicly reachable HTTPS URL pointing to `/api/webhooks/whatsapp`. A temporary `trycloudflare.com` URL works only while both `npm run dev` and the Cloudflare Tunnel process remain running. It is not a production callback URL.
+- Never delete contacts, conversations, leads, or messages merely to make the dashboard look clean. Deletion/reset requires an explicit user request and a narrowly scoped database operation.
+
+### Catalog and Customer-Facing Profile
+- The WhatsApp catalog is connected to the business account and catalog visibility/cart have been verified through the Graph API. Catalog items are managed in Meta Commerce Manager; they are not stored in this Prisma application.
+- Keep the bot's service-catalog fallback (`src/services/service-catalog.ts`) aligned with the Commerce Manager catalog. Use it when a customer asks for services or a portfolio, while retaining a human-safe path for bespoke quotations.
+- Business detail fields should use official public contact information only. Pending business verification may prevent edits in Meta Business Manager. Do not store email passwords, generated access tokens, or other credentials in the repository or documentation.
+
+### Deployment Decision
+- `npm run build` succeeds for all application routes.
+- The Cloudflare deployment failure recorded on 2026-10-14 occurs **after** a successful Next.js build: CI runs bare `npx wrangler deploy`, which attempts an automatic OpenNext migration, installs unpinned packages, and fails inside workerd/Miniflare with `SQLITE_BUSY`.
+- The project currently uses Prisma with the existing VPS PostgreSQL database. A Cloudflare Workers deployment is not a drop-in deployment: it must be explicitly configured and tested with a supported database access path (for example, Hyperdrive plus a compatible driver) before it can be trusted with WhatsApp webhooks.
+- The recommended low-risk production architecture is to host the existing Node/Next.js application on the Windows VPS beside the PostgreSQL database, and expose it through a named Cloudflare Tunnel. This keeps Prisma's current runtime intact and gives Meta a stable HTTPS callback URL.
+- If Workers is selected instead, perform a dedicated migration: upgrade Next.js to a currently supported patch release, install and lock the adapter locally, commit the generated configuration, configure the supported Postgres connectivity layer, add secrets through Cloudflare, and test webhook verification plus a signed event before switching Meta's callback.
+
+### Build Hygiene
+- `postinstall` must run `prisma generate`. Do not use nonexistent Prisma commands or hide their failure with `|| exit 0`.
+- Keep Next.js patched. The repository currently needs a deliberate framework upgrade before choosing Cloudflare Workers/OpenNext, because its prior Next 15.2.0 dependency is outside the adapter's supported range and has a known security warning.
+
+---
+
 ## 🚀 Common Development Workflows
 
 ### Starting Local Dev Server

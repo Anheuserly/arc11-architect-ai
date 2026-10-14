@@ -28,7 +28,7 @@ It handles:
 | **[`03-meta-whatsapp-integration.md`](./03-meta-whatsapp-integration.md)** | Cloud API credentials, webhook verification, message sending, and live syncing. |
 | **[`04-ai-engine-and-client-memory.md`](./04-ai-engine-and-client-memory.md)** | Rule engine, LLM handoff, ClientMemoryService, memory serialization, and lead qualification. |
 | **[`05-api-reference.md`](./05-api-reference.md)** | Complete REST API endpoints (`/api/conversations`, `/api/contacts`, `/api/messages/send`, etc.). |
-| **[`06-current-state-and-next-steps.md`](./06-current-state-and-next-steps.md)** | Exact snapshot of what has been built, recent fixes, verified tests, and immediate next tasks. |
+| **[`06-current-state-and-next-steps.md`](./06-current-state-and-next-steps.md)** | Exact snapshot of what has been built, recent fixes, verified tests, live-integration blockers, deployment decision, and immediate next tasks. |
 
 ---
 
@@ -60,3 +60,7 @@ Local dashboard is served on `http://localhost:3000` (or `http://localhost:3011`
 - `src/services/client-memory.ts`: Persistent memory extractor (likes, dislikes, styles, plot specs) and auto-lead creator.
 - `src/services/ai-engine.ts`: High-fidelity prompt engineering, knowledge base retriever, and memory-aware responder.
 - `src/app/api/webhooks/whatsapp/route.ts`: Webhook listener for incoming messages and delivery receipt updates.
+
+## Operational Status Note
+
+The application build is healthy and the webhook implementation has been tested, but it is **not yet receiving real customer messages** because the Meta app remains unpublished while business verification is in review. See [the current-state handover](./06-current-state-and-next-steps.md) before changing the callback URL, deployment host, catalog integration, or production credentials.
