@@ -14,7 +14,6 @@ The safe placeholder list is in [`.env.example`](../.env.example). Production re
 - `DATABASE_URL`
 - `JWT_SECRET`
 - `COOKIE_SECRET`
-- `PORTAL_ACCESS_KEY`
 - `META_APP_ID`
 - `META_APP_SECRET`
 - `META_ACCESS_TOKEN`

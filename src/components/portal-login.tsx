@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import { Building2, KeyRound, LockKeyhole } from 'lucide-react';
+import { Building2, LockKeyhole } from 'lucide-react';
 
 type PortalLoginProps = {
   onAuthenticated: () => void;
@@ -10,7 +10,6 @@ type PortalLoginProps = {
 export default function PortalLogin({ onAuthenticated }: PortalLoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [accessKey, setAccessKey] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -22,11 +21,11 @@ export default function PortalLogin({ onAuthenticated }: PortalLoginProps) {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, accessKey }),
+        body: JSON.stringify({ email, password }),
       });
       const data = await response.json();
       if (!response.ok || !data.success) {
-        setError('Access could not be verified. Check your credentials and portal access key.');
+        setError('Access could not be verified. Check your email and password.');
         return;
       }
       onAuthenticated();
@@ -52,7 +51,7 @@ export default function PortalLogin({ onAuthenticated }: PortalLoginProps) {
 
         <div className="mb-6 rounded-xl bg-[#f4ede3] p-4 text-sm text-[#6b645c]">
           <div className="mb-1 flex items-center gap-2 font-semibold text-[#1c1a17]"><LockKeyhole className="h-4 w-4" /> Restricted access</div>
-          Sign in with your team account and the private portal access key.
+          Sign in with your authorised team account.
         </div>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
@@ -61,12 +60,6 @@ export default function PortalLogin({ onAuthenticated }: PortalLoginProps) {
           </label>
           <label className="block text-sm font-medium">Password
             <input className="mt-1.5 w-full rounded-xl border border-[#42382c]/15 px-3 py-2.5 outline-none focus:border-[#9b6843]" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
-          </label>
-          <label className="block text-sm font-medium">Portal access key
-            <div className="relative mt-1.5">
-              <KeyRound className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-[#9b6843]" />
-              <input className="w-full rounded-xl border border-[#42382c]/15 py-2.5 pl-9 pr-3 outline-none focus:border-[#9b6843]" type="password" autoComplete="off" value={accessKey} onChange={(event) => setAccessKey(event.target.value)} required />
-            </div>
           </label>
           {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
           <button className="w-full rounded-xl bg-[#9b6843] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#835534] disabled:cursor-not-allowed disabled:opacity-60" disabled={isSubmitting} type="submit">

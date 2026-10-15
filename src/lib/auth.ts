@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { timingSafeEqual } from 'crypto';
 import jwt, { JwtPayload } from 'jsonwebtoken';
 
 const SESSION_COOKIE = 'arc11_session';
@@ -8,16 +7,6 @@ export function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error('JWT_SECRET is not configured');
   return secret;
-}
-
-export function verifyPortalAccessKey(candidate: unknown): boolean {
-  const expected = process.env.PORTAL_ACCESS_KEY;
-  if (!expected || typeof candidate !== 'string') return false;
-
-  const expectedBuffer = Buffer.from(expected);
-  const candidateBuffer = Buffer.from(candidate);
-  return expectedBuffer.length === candidateBuffer.length
-    && timingSafeEqual(expectedBuffer, candidateBuffer);
 }
 
 export function getSession(request: NextRequest): JwtPayload | null {

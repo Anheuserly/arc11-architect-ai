@@ -2,18 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { getJwtSecret, verifyPortalAccessKey } from '@/lib/auth';
+import { getJwtSecret } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, accessKey } = await request.json();
+    const { email, password } = await request.json();
 
-    if (!email || !password || !accessKey) {
-      return NextResponse.json({ error: 'All access credentials are required' }, { status: 400 });
-    }
-
-    if (!verifyPortalAccessKey(accessKey)) {
-      return NextResponse.json({ error: 'Invalid access credentials' }, { status: 401 });
+    if (!email || !password) {
+      return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
     }
 
     const member = await prisma.teamMember.findUnique({
