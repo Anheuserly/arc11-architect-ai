@@ -2,7 +2,11 @@
 // Production PostgreSQL Configuration
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // Workers Builds packages the Prisma client on Debian with OpenSSL 1.1.
+  // Keep `native` for local macOS/Windows development and include the
+  // production engine so the deployed webhook can access PostgreSQL.
+  binaryTargets = ["native", "debian-openssl-1.1.x"]
 }
 
 datasource db {
