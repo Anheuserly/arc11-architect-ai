@@ -5,7 +5,6 @@ import {
   Building2, MessageSquare, Users, ShieldAlert, Award, FileText, 
   Send, Bot, RefreshCw, Search, PlusCircle, UserCheck, Phone
 } from 'lucide-react';
-import PortalLogin from '@/components/portal-login';
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<'inbox' | 'contacts' | 'leads' | 'services' | 'faqs' | 'broadcast'>('inbox');
@@ -33,19 +32,6 @@ export default function DashboardPage() {
   const [testScheduleTime, setTestScheduleTime] = useState('');
   const [isSimulateInbound, setIsSimulateInbound] = useState(false);
   const [testStatus, setTestStatus] = useState<string | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const response = await fetch('/api/auth/session');
-        setIsAuthenticated(response.ok);
-      } catch {
-        setIsAuthenticated(false);
-      }
-    };
-    checkSession();
-  }, []);
 
   const loadChatDetail = useCallback(async (id: string) => {
     try {
@@ -117,17 +103,15 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
     loadConversations();
     loadContacts();
     loadLeads();
     loadServices();
     loadFaqs();
-  }, [isAuthenticated, loadConversations, loadContacts, loadLeads, loadServices, loadFaqs]);
+  }, [loadConversations, loadContacts, loadLeads, loadServices, loadFaqs]);
 
   // Real-Time Polling Hook: Auto-refreshes conversations and currently viewed chat every 3 seconds
   useEffect(() => {
-    if (!isAuthenticated) return;
     const interval = setInterval(() => {
       loadConversations();
       if (selectedChatRef.current?.id) {
@@ -136,7 +120,7 @@ export default function DashboardPage() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [isAuthenticated, loadConversations, loadChatDetail]);
+  }, [loadConversations, loadChatDetail]);
 
   const handleSendMessage = async () => {
     if (!replyText.trim() || !selectedChat) return;
@@ -225,14 +209,6 @@ export default function DashboardPage() {
       (c.messages?.[0]?.body && c.messages[0].body.toLowerCase().includes(term))
     );
   });
-
-  if (isAuthenticated === null) {
-    return <main className="min-h-screen bg-[#f4ede3] flex items-center justify-center text-sm text-[#6b645c]">Checking secure access…</main>;
-  }
-
-  if (!isAuthenticated) {
-    return <PortalLogin onAuthenticated={() => setIsAuthenticated(true)} />;
-  }
 
   return (
     <div className="flex h-screen bg-[#faf7f2] text-[#1c1a17] font-sans overflow-hidden">
