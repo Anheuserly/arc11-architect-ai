@@ -6,6 +6,8 @@ generator client {
   // Use Prisma's JavaScript engine with the PostgreSQL driver adapter. Native
   // Prisma query engines cannot run inside Cloudflare Workers.
   engineType = "client"
+  // Generate the static WebAssembly loader that Cloudflare Workers can bundle.
+  runtime = "workerd"
 }
 
 datasource db {
