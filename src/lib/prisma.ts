@@ -6,10 +6,12 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 function createPrismaClient() {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new Error('DATABASE_URL must be configured before Prisma can connect.');
-  }
+  // Cloudflare makes Worker secrets available at request runtime, not while
+  // `next build` evaluates route modules. The inert build-only URL lets Next
+  // inspect those modules without connecting anywhere. Production requests
+  // always receive DATABASE_URL from the Worker secret.
+  const connectionString =
+    process.env.DATABASE_URL ?? 'postgresql://build:build@127.0.0.1:5432/build';
 
   return new PrismaClient({
     adapter: new PrismaPg({ connectionString }),
